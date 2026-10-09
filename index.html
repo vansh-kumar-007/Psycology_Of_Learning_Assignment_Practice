@@ -86,6 +86,31 @@
     .week-num { display:block; color:var(--muted); font-size:.73rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; margin-bottom:16px; }
     .week-title { display:block; font-weight:780; font-size:1rem; letter-spacing:-.025em; padding-right:18px; }
     .week-meta { display:block; color:var(--muted); font-size:.78rem; margin-top:5px; }
+    .week-tools { display:flex; align-items:center; gap:10px; margin:0 0 14px; }
+    .search-wrap { position:relative; flex:1; min-width:0; }
+    .search-wrap .search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+    .week-search,.week-sort { width:100%; min-height:45px; border:1px solid var(--line); border-radius:13px; background:var(--surface); color:var(--ink); padding:10px 13px; }
+    .week-search { padding-left:40px; }
+    .week-sort { width:auto; min-width:165px; }
+    .week-search:focus,.week-sort:focus { outline:3px solid color-mix(in srgb,var(--gold) 60%,transparent); outline-offset:2px; border-color:var(--accent); }
+    .filter-count { color:var(--muted); font-size:.8rem; white-space:nowrap; }
+    .performance-panel { margin-top:25px; padding:clamp(19px,3vw,28px); background:var(--surface); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow); }
+    .performance-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:22px; }
+    .performance-head h3 { margin:4px 0 5px; font-size:1.25rem; letter-spacing:-.04em; }
+    .performance-head p { margin:0; color:var(--muted); font-size:.86rem; }
+    .performance-summary { display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
+    .mini-stat { border:1px solid var(--line); border-radius:12px; padding:9px 12px; min-width:86px; }
+    .mini-stat strong { display:block; font-size:1.15rem; letter-spacing:-.04em; }
+    .mini-stat span { color:var(--muted); font-size:.7rem; }
+    .chart-bars { display:grid; gap:13px; }
+    .chart-row { display:grid; grid-template-columns:minmax(90px,145px) minmax(60px,1fr) 45px; align-items:center; gap:12px; }
+    .chart-label { font-size:.82rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .chart-track { height:12px; background:var(--surface-2); border-radius:999px; overflow:hidden; }
+    .chart-fill { height:100%; width:0; border-radius:inherit; background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 58%,var(--gold))); transition:width .7s cubic-bezier(.2,.7,.2,1); }
+    .chart-value { text-align:right; font-size:.83rem; font-weight:800; font-variant-numeric:tabular-nums; }
+    .chart-footnote { margin:17px 0 0; color:var(--muted); font-size:.76rem; }
+    .week-card[hidden] { display:none; }
+    .filter-empty { padding:24px; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:16px; }
     .practice-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     .practice-card { border:1px solid var(--line); background:var(--surface); border-radius:20px; padding:22px; display:flex; gap:16px; align-items:flex-start; transition:transform .2s,border-color .2s; }
     .practice-card:hover { transform:translateY(-2px); border-color:var(--accent); }
@@ -148,6 +173,13 @@
       .hero-side { border-radius:20px; display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:19px; }
       .hero-side .stat-divider { display:none; }
       .hero-side .stat-block:last-child { grid-column:1/-1; }
+      .week-tools { align-items:stretch; flex-wrap:wrap; }
+      .week-sort { flex:1; min-width:140px; }
+      .filter-count { width:100%; }
+      .performance-head { flex-direction:column; }
+      .performance-summary { justify-content:flex-start; }
+      .chart-row { grid-template-columns:92px minmax(40px,1fr) 38px; gap:8px; }
+      .chart-label { font-size:.75rem; }
       .week-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
       .week-card { min-height:128px; padding:15px; }
       .practice-grid { grid-template-columns:1fr; }
@@ -367,8 +399,15 @@
         </section>
         <section aria-labelledby="weeksHeading">
           <div class="section-head"><div><div class="eyebrow">Choose your focus</div><h2 id="weeksHeading">Weekly practice</h2><p>Pick a module and work through it at your own pace.</p></div><span class="stat-foot">${W.length} sets</span></div>
-          <div class="week-grid">${weekCards}</div>
+          <div class="week-tools">
+            <label class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input class="week-search" id="weekSearch" type="search" placeholder="Find a week…" aria-label="Search weekly tests"></label>
+            <label><span class="hidden">Sort weekly tests</span><select class="week-sort" id="weekSort" aria-label="Sort weekly tests"><option value="original">Original order</option><option value="name">Week name A–Z</option><option value="best">Highest best score</option></select></label>
+            <span class="filter-count" id="filterCount" aria-live="polite">${W.length} tests</span>
+          </div>
+          <div class="week-grid" id="weekGrid">${weekCards}</div>
+          <div class="filter-empty hidden" id="filterEmpty">No weeks match that search. Try another term.</div>
         </section>
+        ${buildPerformanceChart()}
         <section aria-labelledby="challengeHeading">
           <div class="section-head"><div><div class="eyebrow">More ways to revise</div><h2 id="challengeHeading">Practice modes</h2></div></div>
           <div class="practice-grid">
@@ -378,7 +417,62 @@
         </section>`;
       app.querySelectorAll('[data-week]').forEach(b=>b.addEventListener('click',()=>start(Number(b.dataset.week))));
       app.querySelectorAll('[data-start]').forEach(b=>b.addEventListener('click',()=>start(Number(b.dataset.start))));
+      setupWeekFilters();
       goTop();
+    }
+    function buildPerformanceChart(){
+      const entries=Object.entries(history.weekScores||{})
+        .map(([key,value])=>({index:Number(key),label:L[Number(key)],score:Number(value.score),total:Number(value.total)}))
+        .filter(item=>Number.isInteger(item.index)&&item.index>=0&&item.index<L.length&&item.total>0&&Number.isFinite(item.score))
+        .map(item=>({...item,percent:Math.round(item.score/item.total*100)}))
+        .sort((a,b)=>a.index-b.index);
+      if(!entries.length) return `
+        <section class="performance-panel" aria-labelledby="performanceTitle">
+          <div class="performance-head"><div><div class="eyebrow">Your learning analytics</div><h3 id="performanceTitle">Weekly performance</h3><p>Your best result for each week appears here after you complete a weekly test.</p></div></div>
+          <div class="empty-state"><div style="font-size:1.5rem;margin-bottom:8px" aria-hidden="true">↗</div><strong>Your progress story starts here.</strong><br>Complete any weekly test to see your score visualised.</div>
+        </section>`;
+      const average=Math.round(entries.reduce((sum,item)=>sum+item.percent,0)/entries.length);
+      const bars=entries.map(item=>`
+        <div class="chart-row" title="${esc(item.label)}: ${item.score} out of ${item.total} (${item.percent}%)">
+          <span class="chart-label">${esc(item.label)}</span>
+          <div class="chart-track" role="img" aria-label="${esc(item.label)} best score: ${item.percent} percent"><div class="chart-fill" style="width:${item.percent}%"></div></div>
+          <span class="chart-value">${item.percent}%</span>
+        </div>`).join('');
+      return `
+        <section class="performance-panel" aria-labelledby="performanceTitle">
+          <div class="performance-head"><div><div class="eyebrow">Your learning analytics</div><h3 id="performanceTitle">Weekly performance</h3><p>Best recorded score in each completed weekly test.</p></div>
+            <div class="performance-summary"><div class="mini-stat"><strong>${entries.length}/${W.length}</strong><span>Weeks attempted</span></div><div class="mini-stat"><strong>${average}%</strong><span>Average best score</span></div></div>
+          </div>
+          <div class="chart-bars">${bars}</div>
+          <p class="chart-footnote">Scores are calculated from your saved weekly results in this browser. The chart updates when you complete another weekly test.</p>
+        </section>`;
+    }
+    function setupWeekFilters(){
+      const grid=document.getElementById('weekGrid'), search=document.getElementById('weekSearch'), sort=document.getElementById('weekSort');
+      const count=document.getElementById('filterCount'), empty=document.getElementById('filterEmpty');
+      if(!grid||!search||!sort)return;
+      const cards=Array.from(grid.querySelectorAll('.week-card'));
+      function update(){
+        const query=search.value.trim().toLowerCase();
+        const ordered=[...cards];
+        if(sort.value==='name')ordered.sort((a,b)=>a.querySelector('.week-title').textContent.localeCompare(b.querySelector('.week-title').textContent,undefined,{numeric:true}));
+        if(sort.value==='best')ordered.sort((a,b)=>{
+          const sa=history.weekScores[a.dataset.week], sb=history.weekScores[b.dataset.week];
+          const pa=sa&&sa.total?sa.score/sa.total:-1, pb=sb&&sb.total?sb.score/sb.total:-1;
+          return pb-pa;
+        });
+        ordered.forEach(card=>grid.appendChild(card));
+        let visible=0;
+        cards.forEach(card=>{
+          const matches=card.textContent.toLowerCase().includes(query);
+          card.hidden=!matches;
+          if(matches)visible++;
+        });
+        count.textContent=`${visible} of ${cards.length} tests`;
+        empty.classList.toggle('hidden',visible!==0);
+      }
+      search.addEventListener('input',update);
+      sort.addEventListener('change',update);
     }
     function prepareQuestions(i){
       let list=i<0?W.flatMap((week,k)=>week.map(q=>[...q,L[k]])):W[i].map(q=>[...q,L[i]]);
